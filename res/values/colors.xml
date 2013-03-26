@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<color name="arena_bg">#000</color>
+	<color name="emitter_outline">#aaa</color>
+	<color name="emitter_active">#aaa</color>
+
+	<color name="fire">#f00</color>
+	
+	<color name="transparent">#00000000</color>
+</resources>
