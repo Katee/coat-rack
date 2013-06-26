@@ -12,11 +12,15 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 
+import com.neurosky.thinkgear.TGDevice;
+import com.neurosky.thinkgear.TGEegPower;
+
 import android.app.ActionBar;
 import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.DialogFragment;
 import android.app.PendingIntent;
+import android.bluetooth.BluetoothAdapter;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -26,6 +30,8 @@ import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.util.Log;
@@ -58,6 +64,9 @@ public class MainActivity extends Activity {
 	CoatRackView ringView;
 
 	SharedPreferences prefs;
+
+	TGDevice tgDevice;
+	BluetoothAdapter btAdapter;
 
 	BroadcastReceiver receiver = new BroadcastReceiver() {
 		@Override
@@ -121,6 +130,12 @@ public class MainActivity extends Activity {
 		registerReceiver(receiver, new IntentFilter(intent));
 		wifiManager = (WifiManager) getSystemService(WIFI_SERVICE);
 		createWifiAccessPoint();
+		
+		btAdapter = BluetoothAdapter.getDefaultAdapter();
+		if (btAdapter != null) {
+			tgDevice = new TGDevice(btAdapter, handler);
+			tgDevice.connect(false);
+		}
 	}
 
 	@Override
@@ -128,6 +143,10 @@ public class MainActivity extends Activity {
 		super.onPause();
 		unregisterReceiver(receiver);
 		wifiManager.setWifiEnabled(false);
+		
+		if (tgDevice != null) {
+			tgDevice.close();
+		}
 	}
 
 	public void startTimeout() {
@@ -259,4 +278,48 @@ public class MainActivity extends Activity {
 			Log.e(LOG_TAG, "Your phone's API does not contain setWifiApEnabled method to configure an access point");
 		}
 	}
+
+	private final Handler handler = new Handler() {
+
+		@Override
+		public void handleMessage(Message msg) {
+			switch (msg.what) {
+			case TGDevice.MSG_STATE_CHANGE:
+				switch (msg.arg1) {
+				case TGDevice.STATE_IDLE:
+					break;
+				case TGDevice.STATE_CONNECTING:
+					break;
+				case TGDevice.STATE_CONNECTED:
+					tgDevice.start();
+					Log.i(LOG_TAG, "Connecting to bluetooth device");
+					break;
+				case TGDevice.STATE_DISCONNECTED:
+					break;
+				case TGDevice.STATE_NOT_FOUND:
+				case TGDevice.STATE_NOT_PAIRED:
+				default:
+					break;
+				}
+				break;
+			case TGDevice.MSG_POOR_SIGNAL:
+				Log.e(LOG_TAG, "poor signal: " + msg.arg1);
+			case TGDevice.MSG_ATTENTION:
+				Log.e(LOG_TAG, "attention: " + msg.arg1);
+				break;
+			case TGDevice.MSG_MEDITATION:
+				Log.e(LOG_TAG, "meditation: " + msg.arg1);
+				break;
+			case TGDevice.MSG_RAW_DATA:
+				break;
+			case TGDevice.MSG_EEG_POWER:
+				Log.v(LOG_TAG, "PoorSignal: " + msg.arg1);
+				Log.v(LOG_TAG, "Attention: " + msg.arg1);
+				TGEegPower ep = (TGEegPower)msg.obj;
+				Log.v(LOG_TAG, "Delta: " + ep.delta);
+			default:
+				break;
+			}
+		}
+	};
 }
