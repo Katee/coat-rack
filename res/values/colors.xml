@@ -7,4 +7,8 @@
 	<color name="fire">#f00</color>
 	
 	<color name="transparent">#00000000</color>
+	
+	<color name="signal">#0f0</color>
+	<color name="attention">#f00</color>
+	<color name="meditation">#00f</color>
 </resources>

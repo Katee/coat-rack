@@ -3,4 +3,12 @@
     <string name="server_address">Server Address</string>
     <string name="server_port">Port</string>
     <string name="connect">Connect</string>
+    <string name="eruption">Eruption</string>
+    
+    <string name="attention">Attention</string>
+    <string name="meditation">Meditation</string>
+    <string name="signal">Signal</string>
+    <string name="heart_value">Heart Rate: %s</string>
+    
+    <string name="save_settings">Save Settings</string>
 </resources>

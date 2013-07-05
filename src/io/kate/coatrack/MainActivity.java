@@ -12,9 +12,6 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 
-import com.neurosky.thinkgear.TGDevice;
-import com.neurosky.thinkgear.TGEegPower;
-
 import android.app.ActionBar;
 import android.app.Activity;
 import android.app.AlarmManager;
@@ -38,9 +35,18 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.view.View;
-import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import com.jjoe64.graphview.GraphView;
+import com.jjoe64.graphview.GraphView.GraphViewData;
+import com.jjoe64.graphview.GraphViewSeries;
+import com.jjoe64.graphview.GraphViewSeries.GraphViewSeriesStyle;
+import com.jjoe64.graphview.LineGraphView;
+import com.neurosky.thinkgear.TGDevice;
+import com.neurosky.thinkgear.TGEegPower;
+import com.neurosky.thinkgear.TGRawMulti;
 
 public class MainActivity extends Activity {
 	public static final String intent = "io.kate.coatrack.update";
@@ -48,7 +54,7 @@ public class MainActivity extends Activity {
 	public static final int num_effects_in_ring = 8;
 	Button button;
 
-	String ssid = "CoatRack";
+	String ssid = "CoatRack2";
 	String wirelessPassword = "dootdoot";
 
 	public String ipString;
@@ -58,20 +64,39 @@ public class MainActivity extends Activity {
 
 	int timeout = 100; // flame effects turn off after 100 milliseconds
 	int refreshTimeout = 50;
-	
+
 	WifiManager wifiManager;
 
 	CoatRackView ringView;
 
 	SharedPreferences prefs;
 
+	PendingIntent pintent;
+	
 	TGDevice tgDevice;
 	BluetoothAdapter btAdapter;
+	
+	private GraphView graphView;
+	private GraphViewSeries attentionSeries;
+	private GraphViewSeries meditationSeries;
+	
+	private double attentionSeriesLastX = 0d;
+	private double meditationSeriesLastX = 0d;
+	
+	private TextView signal;
+	private TextView attention;
+	private TextView meditation;
+	
+	private int fireOnMeditationOf = -1;
+	private int fireOnAttentionOf = -1;
+	
+	private boolean meditationShouldFire = false;
+	private boolean attentionShouldFire = false;
 
 	BroadcastReceiver receiver = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context context, Intent intent) {
-			if (intent.getAction().equals(intent))
+			if (ringView == null || ringView.getEmitters() == null)
 				return;
 			for (EmitterView emitter : ringView.getEmitters()) {
 				if (System.currentTimeMillis() - emitter.lastActivated > timeout) {
@@ -82,6 +107,9 @@ public class MainActivity extends Activity {
 					}
 					ringView.postInvalidate();
 				}
+			}
+			if (button.isPressed() || meditationShouldFire || attentionShouldFire) {
+				triggerEffects(new int[] { 0, 1, 2, 3, 4, 5, 6, 7 });
 			}
 		}
 	};
@@ -113,20 +141,32 @@ public class MainActivity extends Activity {
 		};
 
 		button = (Button) findViewById(R.id.eruption);
-		button.setOnClickListener(new OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				// Fire all the flame effects
-				triggerEffects(new int[] { 0, 1, 2, 3, 4, 5, 6, 7 });
-			}
-		});
+		
+		graphView = new LineGraphView(this, "");
+		graphView.setViewPort(0, 30);
+		graphView.setScrollable(true);
+		graphView.setManualYAxisBounds(100, 0);
+		
+		attentionSeries = new GraphViewSeries("attention", new GraphViewSeriesStyle(getResources().getColor(R.color.attention), 3), new GraphViewData[] {new GraphViewData(0, 50)});
+		meditationSeries = new GraphViewSeries("meditation", new GraphViewSeriesStyle(getResources().getColor(R.color.meditation), 3), new GraphViewData[] {new GraphViewData(0, 50)});
+		
+		graphView.addSeries(attentionSeries);
+		graphView.addSeries(meditationSeries);
 
-		startTimeout();
+		LinearLayout layout = (LinearLayout) findViewById(R.id.viewer1);
+		layout.addView(graphView);
+		
+		signal = (TextView) findViewById(R.id.signal);
+		attention = (TextView) findViewById(R.id.attention);
+		meditation = (TextView) findViewById(R.id.meditation);
 	}
 
 	@Override
 	public void onResume() {
 		super.onResume();
+
+		startTimeout();
+		
 		registerReceiver(receiver, new IntentFilter(intent));
 		wifiManager = (WifiManager) getSystemService(WIFI_SERVICE);
 		createWifiAccessPoint();
@@ -136,6 +176,11 @@ public class MainActivity extends Activity {
 			tgDevice = new TGDevice(btAdapter, handler);
 			tgDevice.connect(false);
 		}
+		
+		if (prefs.getBoolean(CoatRackApplication.PREF_ATTENTION_ENABLED, false))
+		fireOnAttentionOf = prefs.getInt(CoatRackApplication.PREF_ATTENTION_CUTOFF, -1);
+		if (prefs.getBoolean(CoatRackApplication.PREF_MEDITATION_ENABLED, false))
+		fireOnMeditationOf = prefs.getInt(CoatRackApplication.PREF_MEDITATION_CUTOFF, -1);
 	}
 
 	@Override
@@ -147,17 +192,20 @@ public class MainActivity extends Activity {
 		if (tgDevice != null) {
 			tgDevice.close();
 		}
+		
+		AlarmManager manager = (AlarmManager) (this
+				.getSystemService(Context.ALARM_SERVICE));
+		manager.cancel(pintent);
 	}
 
 	public void startTimeout() {
-		PendingIntent pintent = PendingIntent.getBroadcast(this, 0, new Intent(
-				intent), 0);
+		pintent = PendingIntent.getBroadcast(this, 0, new Intent(intent), 0);
 		AlarmManager manager = (AlarmManager) (this
 				.getSystemService(Context.ALARM_SERVICE));
 
 		manager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-				SystemClock.elapsedRealtime() + refreshTimeout, refreshTimeout,
-				pintent);
+						SystemClock.elapsedRealtime() + refreshTimeout, refreshTimeout,
+						pintent);
 	}
 
 	private class ConnectTask extends AsyncTask<byte[], Void, Void> {
@@ -214,9 +262,14 @@ public class MainActivity extends Activity {
 
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
+		DialogFragment newFragment;
 		switch (item.getItemId()) {
 		case R.id.connect:
-			DialogFragment newFragment = new ServerDialogFragment();
+			newFragment = new ServerDialogFragment();
+			newFragment.show(getFragmentManager(), "dialog");
+			return true;
+		case R.id.eeg_settings:
+			newFragment = new EEGActivationFragment();
 			newFragment.show(getFragmentManager(), "dialog");
 			return true;
 		default:
@@ -225,37 +278,41 @@ public class MainActivity extends Activity {
 	}
 
 	private void createWifiAccessPoint() {
-		
+
 		if (wifiManager.isWifiEnabled()) {
 			wifiManager.setWifiEnabled(false);
 		}
-		
+
 		// Get all declared methods in WifiManager class
 		Method[] wmMethods = wifiManager.getClass().getDeclaredMethods();
-		
+
 		boolean methodFound = false;
 		for (Method method : wmMethods) {
 			if (method.getName().equals("setWifiApEnabled")) {
 				methodFound = true;
 				WifiConfiguration netConfig = new WifiConfiguration();
 				netConfig.SSID = ssid;
-//				netConfig.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
+				// netConfig.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
 				netConfig.allowedProtocols.set(WifiConfiguration.Protocol.WPA);
 				netConfig.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK);
-				netConfig.preSharedKey= wirelessPassword;
+				netConfig.preSharedKey = wirelessPassword;
 				try {
-					boolean apstatus = (Boolean) method.invoke(wifiManager, netConfig, true);
-					Log.e(LOG_TAG, String.format("Creating a Wi-Fi Network %s", netConfig.SSID));
+					boolean apstatus = (Boolean) method.invoke(wifiManager, netConfig,
+							true);
+					Log.e(LOG_TAG,
+							String.format("Creating a Wi-Fi Network %s", netConfig.SSID));
 					for (Method isWifiApEnabledmethod : wmMethods) {
 						if (isWifiApEnabledmethod.getName().equals("isWifiApEnabled")) {
 							while (!(Boolean) isWifiApEnabledmethod.invoke(wifiManager)) {
-							};
+							}
+							;
 							for (Method method1 : wmMethods) {
 								if (method1.getName().equals("getWifiApState")) {
 									int apstate;
 									apstate = (Integer) method1.invoke(wifiManager);
 									// netConfig=(WifiConfiguration)method1.invoke(wifi);
-									Log.e(LOG_TAG, String.format("SSID: %s, Password: %s", netConfig.SSID, netConfig.preSharedKey));
+									Log.e(LOG_TAG, String.format("SSID: %s, Password: %s",
+											netConfig.SSID, netConfig.preSharedKey));
 								}
 							}
 						}
@@ -275,7 +332,9 @@ public class MainActivity extends Activity {
 			}
 		}
 		if (!methodFound) {
-			Log.e(LOG_TAG, "Your phone's API does not contain setWifiApEnabled method to configure an access point");
+			Log.e(
+					LOG_TAG,
+					"Your phone's API does not contain setWifiApEnabled method to configure an access point");
 		}
 	}
 
@@ -283,16 +342,18 @@ public class MainActivity extends Activity {
 
 		@Override
 		public void handleMessage(Message msg) {
+			//Log.e(LOG_TAG, "msg: " + msg);
 			switch (msg.what) {
 			case TGDevice.MSG_STATE_CHANGE:
 				switch (msg.arg1) {
 				case TGDevice.STATE_IDLE:
 					break;
 				case TGDevice.STATE_CONNECTING:
+					Log.i(LOG_TAG, "Connecting to bluetooth device");
 					break;
 				case TGDevice.STATE_CONNECTED:
 					tgDevice.start();
-					Log.i(LOG_TAG, "Connecting to bluetooth device");
+					Log.i(LOG_TAG, "Connected to bluetooth device");
 					break;
 				case TGDevice.STATE_DISCONNECTED:
 					break;
@@ -302,21 +363,38 @@ public class MainActivity extends Activity {
 					break;
 				}
 				break;
-			case TGDevice.MSG_POOR_SIGNAL:
-				Log.e(LOG_TAG, "poor signal: " + msg.arg1);
-			case TGDevice.MSG_ATTENTION:
-				Log.e(LOG_TAG, "attention: " + msg.arg1);
-				break;
-			case TGDevice.MSG_MEDITATION:
-				Log.e(LOG_TAG, "meditation: " + msg.arg1);
-				break;
 			case TGDevice.MSG_RAW_DATA:
 				break;
+			case TGDevice.MSG_RAW_MULTI:
+				TGRawMulti multiRaw = (TGRawMulti)msg.obj;
+				Log.e(LOG_TAG, "raw multi: " + multiRaw.ch1);
+				break;
+			case TGDevice.MSG_POOR_SIGNAL:
+				Integer signalValue = (200 - msg.arg1) / 2;
+				signal.setText(signalValue.toString());
+				break;
+			case TGDevice.MSG_ATTENTION:
+				Integer attentionValue = msg.arg1;
+				attentionSeries.appendData(new GraphViewData(attentionSeriesLastX, attentionValue), true);
+				attentionSeriesLastX += 1d;
+				attention.setText(attentionValue.toString());
+				attentionShouldFire = attentionValue > fireOnAttentionOf;
+				break;
+			case TGDevice.MSG_MEDITATION:
+				Integer meditationValue = msg.arg1;
+				meditationSeries.appendData(new GraphViewData(meditationSeriesLastX, meditationValue), true);
+				meditationSeriesLastX += 1d;
+				meditation.setText(meditationValue.toString());
+				meditationShouldFire = meditationValue > fireOnMeditationOf;
+				break;
+			case TGDevice.MSG_HEART_RATE:
+				break;
+			case TGDevice.MSG_BLINK:
+				// TODO show blink icon
+				break;
 			case TGDevice.MSG_EEG_POWER:
-				Log.v(LOG_TAG, "PoorSignal: " + msg.arg1);
-				Log.v(LOG_TAG, "Attention: " + msg.arg1);
 				TGEegPower ep = (TGEegPower)msg.obj;
-				Log.v(LOG_TAG, "Delta: " + ep.delta);
+				Log.e(LOG_TAG, "Delta: " + ep.delta);
 			default:
 				break;
 			}

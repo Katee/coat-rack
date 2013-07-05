@@ -1,20 +1,103 @@
-<RelativeLayout
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="fill_parent"
-    android:layout_height="fill_parent"
-    android:orientation="vertical"
-    >
-    <io.kate.coatrack.CoatRackView
-        android:id="@+id/ring_view"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#000"
-        />
-    <Button 
-        android:id="@+id/eruption"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
-        android:text="Eruption"
-        />
-</RelativeLayout>
+	android:layout_width="fill_parent"
+	android:layout_height="fill_parent"
+	android:orientation="horizontal"
+	>
+	<RelativeLayout
+		android:layout_width="0dip"
+		android:layout_height="fill_parent"
+		android:orientation="vertical"
+		android:layout_weight="1"
+		>
+		<io.kate.coatrack.CoatRackView
+	        android:id="@+id/ring_view"
+	        android:layout_width="match_parent"
+	        android:layout_height="match_parent"
+	        android:background="#000"
+	        />
+	    <Button 
+	        android:id="@+id/eruption"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:layout_centerInParent="true"
+	        android:text="@string/eruption"
+	        />
+    </RelativeLayout>
+    <LinearLayout
+		android:layout_width="0dip"
+		android:layout_height="fill_parent"
+		android:layout_weight="1"
+		android:background="@color/arena_bg"
+		android:orientation="vertical">
+	    <LinearLayout
+			android:layout_width="fill_parent"
+			android:layout_height="0dip"
+			android:layout_weight="1"
+			android:orientation="horizontal">
+			<LinearLayout
+				android:layout_width="0dip"
+				android:layout_height="fill_parent"
+				android:layout_weight="1"
+				android:orientation="vertical"
+				android:gravity="center">
+				<TextView 
+				    android:id="@+id/signal"
+				    style="@style/BigText"
+				    android:text="-"
+				    android:textColor="@color/signal"
+				    android:layout_width="wrap_content"
+				    android:layout_height="wrap_content" />
+				<TextView 
+				    android:text="@string/signal"
+				    android:textColor="@color/signal"
+				    android:layout_width="wrap_content"
+				    android:layout_height="wrap_content" />
+			</LinearLayout>
+			<LinearLayout
+				android:layout_width="0dip"
+				android:layout_height="fill_parent"
+				android:layout_weight="1"
+				android:orientation="vertical"
+				android:gravity="center">
+				<TextView 
+				    android:id="@+id/attention"
+				    style="@style/BigText"
+				    android:text="-"
+				    android:textColor="@color/attention"
+				    android:layout_width="wrap_content"
+				    android:layout_height="wrap_content" />
+				<TextView 
+				    android:text="@string/attention"
+				    android:textColor="@color/attention"
+				    android:layout_width="wrap_content"
+				    android:layout_height="wrap_content" />
+			</LinearLayout>
+			<LinearLayout
+				android:layout_width="0dip"
+				android:layout_height="fill_parent"
+				android:layout_weight="1"
+				android:orientation="vertical"
+				android:gravity="center">
+				<TextView 
+				    android:id="@+id/meditation"
+				    style="@style/BigText"
+				    android:text="-"
+				    android:textColor="@color/meditation"
+				    android:layout_width="wrap_content"
+				    android:layout_height="wrap_content" />
+				<TextView 
+				    android:text="@string/meditation"
+				    android:textColor="@color/meditation"
+				    android:layout_width="wrap_content"
+				    android:layout_height="wrap_content" />
+			</LinearLayout>
+		</LinearLayout>
+        <LinearLayout android:id="@+id/viewer1"
+			android:layout_width="fill_parent"
+			android:layout_height="0dip"
+			android:layout_weight="3"
+			/>
+    </LinearLayout>
+</LinearLayout>

@@ -47,6 +47,7 @@ public class ServerDialogFragment extends DialogFragment {
 		        editor.putInt(CoatRackApplication.PREF_SERVER_PORT, port);
 		        
 		        editor.commit();
+		        getDialog().dismiss();
 			}
 		});
 		
