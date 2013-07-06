@@ -3,4 +3,7 @@
      <style name="BigText">
          <item name="android:textSize">60sp</item>
      </style>
+     <style name="EffectButton">
+         <item name="android:textSize">20sp</item>
+     </style>
 </resources>

@@ -11,6 +11,8 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 
 import android.app.ActionBar;
 import android.app.Activity;
@@ -52,7 +54,10 @@ public class MainActivity extends Activity {
 	public static final String intent = "io.kate.coatrack.update";
 	public static final String LOG_TAG = MainActivity.class.getName();
 	public static final int num_effects_in_ring = 8;
-	Button button;
+	Button buttonEruption;
+	Button buttonEruption2;
+	Button buttonPinwheel;
+	Button buttonRandom;
 
 	String ssid = "CoatRack2";
 	String wirelessPassword = "dootdoot";
@@ -92,6 +97,8 @@ public class MainActivity extends Activity {
 	
 	private boolean meditationShouldFire = false;
 	private boolean attentionShouldFire = false;
+	
+	private long step;
 
 	BroadcastReceiver receiver = new BroadcastReceiver() {
 		@Override
@@ -108,9 +115,19 @@ public class MainActivity extends Activity {
 					ringView.postInvalidate();
 				}
 			}
-			if (button.isPressed() || meditationShouldFire || attentionShouldFire) {
+			if (buttonEruption2.isPressed() || buttonEruption.isPressed() || meditationShouldFire || attentionShouldFire) {
 				triggerEffects(new int[] { 0, 1, 2, 3, 4, 5, 6, 7 });
 			}
+			
+			if (buttonRandom.isPressed()) {
+				doRandom();
+			}
+			
+			if (buttonPinwheel.isPressed()) {
+				doPinwheel();
+			}
+			
+			step++;
 		}
 	};
 
@@ -140,7 +157,10 @@ public class MainActivity extends Activity {
 			}
 		};
 
-		button = (Button) findViewById(R.id.eruption);
+		buttonEruption = (Button) findViewById(R.id.button_eruption);
+		buttonEruption2 = (Button) findViewById(R.id.button_eruption2);
+		buttonPinwheel = (Button) findViewById(R.id.button_pinwheel);
+		buttonRandom = (Button) findViewById(R.id.button_random);
 		
 		graphView = new LineGraphView(this, "");
 		graphView.setViewPort(0, 30);
@@ -159,6 +179,18 @@ public class MainActivity extends Activity {
 		signal = (TextView) findViewById(R.id.signal);
 		attention = (TextView) findViewById(R.id.attention);
 		meditation = (TextView) findViewById(R.id.meditation);
+		
+	  final ActionBar bar = getActionBar();
+	  bar.setNavigationMode(ActionBar.NAVIGATION_MODE_TABS);
+	  bar.setDisplayOptions(0, ActionBar.DISPLAY_SHOW_TITLE);
+	
+	  bar.addTab(bar.newTab()
+	          .setText(R.string.register_player)
+	          .setTabListener(new TabListener(arenaDisplayFragment, "Register Player")));
+	
+	  if (savedInstanceState != null) {
+	      bar.setSelectedNavigationItem(savedInstanceState.getInt("tab", 0));
+	  }
 	}
 
 	@Override
@@ -181,6 +213,8 @@ public class MainActivity extends Activity {
 		fireOnAttentionOf = prefs.getInt(CoatRackApplication.PREF_ATTENTION_CUTOFF, -1);
 		if (prefs.getBoolean(CoatRackApplication.PREF_MEDITATION_ENABLED, false))
 		fireOnMeditationOf = prefs.getInt(CoatRackApplication.PREF_MEDITATION_CUTOFF, -1);
+		
+		step = 0;
 	}
 
 	@Override
@@ -216,6 +250,19 @@ public class MainActivity extends Activity {
 	}
 
 	private void triggerEffects(int[] ids) {
+		EmitterView[] emitters = ringView.getEmitters();
+		byte[] message = new byte[ids.length];
+		for (int i = 0; i < ids.length; i++) {
+			emitters[ids[i]].lastActivated = System.currentTimeMillis();
+			emitters[ids[i]].intensity = 1;
+			message[i] = (byte) (ids[i] + hack);
+		}
+		(new ConnectTask()).execute(message);
+		ringView.postInvalidate();
+	}
+	
+	// This is dumb and probably means I can't java
+	private void triggerEffects(Integer[] ids) {
 		EmitterView[] emitters = ringView.getEmitters();
 		byte[] message = new byte[ids.length];
 		for (int i = 0; i < ids.length; i++) {
@@ -336,6 +383,27 @@ public class MainActivity extends Activity {
 					LOG_TAG,
 					"Your phone's API does not contain setWifiApEnabled method to configure an access point");
 		}
+	}
+	
+	private void doRandom() {
+		if (step % 2 == 0) return;
+		
+		List<Integer> effectsToFire = new ArrayList<Integer>(8);
+		for (int i = 0; i < num_effects_in_ring; i++) {
+			if (Math.random() > .5) {
+				effectsToFire.add(i);
+			}
+		}
+		
+		Integer[] fireEffects = new Integer[0];
+		fireEffects = effectsToFire.toArray(fireEffects);
+		triggerEffects(fireEffects);
+	}
+	
+	private void doPinwheel() {
+		int slowDown = 5;
+		int fireEffect = (int) ((step / slowDown) % num_effects_in_ring);
+		triggerEffect(fireEffect);
 	}
 
 	private final Handler handler = new Handler() {
